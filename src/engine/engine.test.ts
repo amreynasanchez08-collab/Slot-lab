@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { evaluateBase, evaluateBaseFast, evaluateFree, evaluateFreeFast, evaluateLine } from './evaluate.ts';
 import { analyzeMachine, buildReelSet, tune, type Machine } from './machine.ts';
 import { createRng } from './rng.ts';
-import { newSession, playSpin } from './session.ts';
+import { BET_LEVELS, newSession, playSpin, setBet, stepBet } from './session.ts';
 import { simulate } from './simulate.ts';
 import {
   BELL,
@@ -206,5 +206,32 @@ describe('session', () => {
   it('reports the same analysis as the tuner', () => {
     const r = tune({ rtp: 0.95, bonusEvery: 150 });
     expect(analyzeMachine(r.machine).rtp).toBe(r.analysis.rtp);
+  });
+});
+
+describe('bet ladder', () => {
+  it('holds only valid bets, in rising order', () => {
+    for (const bet of BET_LEVELS) expect(bet % 5).toBe(0);
+    expect([...BET_LEVELS].sort((x, y) => x - y)).toEqual(BET_LEVELS);
+  });
+
+  it('steps up and down and stops at the ends', () => {
+    expect(stepBet(100, 1)).toBe(150);
+    expect(stepBet(100, -1)).toBe(75);
+    expect(stepBet(5, -1)).toBe(5);
+    expect(stepBet(2_000, 1)).toBe(2_000);
+    // A bet between levels moves to the neighbouring level.
+    expect(stepBet(110, 1)).toBe(150);
+    expect(stepBet(110, -1)).toBe(100);
+    // A bet above the ladder, typed in the settings: up keeps it, down goes to the top level.
+    expect(stepBet(5_000, 1)).toBe(5_000);
+    expect(stepBet(5_000, -1)).toBe(2_000);
+  });
+
+  it('keeps paying a running round on the bet that triggered it', () => {
+    const s = setBet({ balance: 10_000, bet: 100, freeGamesLeft: 5, roundBet: 100, roundWin: 0, lastWin: 0 }, 500);
+    expect(s.bet).toBe(500);
+    expect(s.roundBet).toBe(100);
+    expect(() => setBet(s, 7)).toThrow(RangeError);
   });
 });

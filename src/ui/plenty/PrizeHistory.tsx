@@ -21,10 +21,12 @@ interface Props {
   totalSpins: number;
   onExport: () => void;
   onClear: () => void;
+  /** Label of the count of prizes with stars >= 3 (the game's bonus feature). */
+  featureLabel?: string;
 }
 
 /** Every past prize, saved on this device, newest or biggest first. */
-export function PrizeHistory({ prizes, totalSpins, onExport, onClear }: Props) {
+export function PrizeHistory({ prizes, totalSpins, onExport, onClear, featureLabel = 'Con 3+ estrellas' }: Props) {
   const [view, setView] = useState<View>('recent');
   const [confirmClear, setConfirmClear] = useState(false);
   const rows = view === 'recent' ? [...prizes].reverse() : [...prizes].sort((a, b) => b.win / b.bet - a.win / a.bet);
@@ -69,7 +71,7 @@ export function PrizeHistory({ prizes, totalSpins, onExport, onClear }: Props) {
         <Fig label="Premios" value={formatInt(prizes.length)} sub={totalSpins ? `en ${formatInt(totalSpins)} giros` : undefined} />
         <Fig label="Total ganado" value={formatMoney(prizes.reduce((s, p) => s + p.win, 0))} />
         <Fig label="Mayor premio" value={best ? `${(best.win / best.bet).toFixed(1)}x` : '—'} sub={best ? `${formatMoney(best.win)} · giro ${formatInt(best.spin)}` : undefined} />
-        <Fig label="Con 3+ estrellas" value={formatInt(starPrizes)} />
+        <Fig label={featureLabel} value={formatInt(starPrizes)} />
       </div>
 
       <div className="mt-4 flex gap-1 rounded-full bg-neutral-950/60 p-1 text-sm">

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { tune } from '../engine/machine.ts';
+import { GranShowDefs } from './bigshow/GranShowSymbols.tsx';
 import { Field, TabBar } from './Controls.tsx';
 import { formatMoney, formatPct, parseMoney } from './format.ts';
 import { MathPanel } from './MathPanel.tsx';
@@ -26,6 +27,15 @@ export function BigShowLab({ active }: { active: boolean }) {
   const [config, setConfig] = useState<Config>({ startBalance: 10_000, bet: 100, targetRtp: 95, bonusEvery: 150, version: 0 });
   const [form, setForm] = useState({ startBalance: '100.00', bet: '1.00', targetRtp: '95', bonusEvery: '150' });
 
+  // On a phone the settings start folded so the machine shows first.
+  const [showSettings, setShowSettings] = useState(() => {
+    try {
+      return window.matchMedia('(min-width: 640px)').matches;
+    } catch {
+      return true;
+    }
+  });
+
   const tuned = useMemo(() => tune({ rtp: config.targetRtp / 100, bonusEvery: config.bonusEvery }), [config.targetRtp, config.bonusEvery]);
   const a = tuned.analysis;
 
@@ -50,8 +60,22 @@ export function BigShowLab({ active }: { active: boolean }) {
 
   return (
     <div className="space-y-6">
+      {/* Symbol gradients, outside the tabs: a hidden tab would switch them off for the others. */}
+      <GranShowDefs />
       <TabBar tab={tab} onChange={setTab} />
-      <section className="flex flex-wrap items-end gap-4 rounded-2xl bg-neutral-900 p-5">
+      {!showSettings && (
+        <button
+          type="button"
+          onClick={() => setShowSettings(true)}
+          className="flex w-full items-center justify-between rounded-2xl bg-neutral-900 px-5 py-3 text-left text-sm text-neutral-300"
+        >
+          <span className="font-semibold text-neutral-100">Ajustes</span>
+          <span className="text-xs text-neutral-500">
+            RTP {formatPct(a.rtp, 2)} · saldo inicial {formatMoney(config.startBalance)} ▸
+          </span>
+        </button>
+      )}
+      <section hidden={!showSettings} className="flex flex-wrap items-end gap-4 rounded-2xl bg-neutral-900 p-5">
         <Field label="Saldo inicial ($)" value={form.startBalance} onChange={(v) => setForm((f) => ({ ...f, startBalance: v }))} />
         <Field label="Apuesta por giro ($)" value={form.bet} onChange={(v) => setForm((f) => ({ ...f, bet: v }))} />
         <Field label={`RTP objetivo (${RTP_MIN}–${RTP_MAX}%)`} value={form.targetRtp} onChange={(v) => setForm((f) => ({ ...f, targetRtp: v }))} />
@@ -75,6 +99,9 @@ export function BigShowLab({ active }: { active: boolean }) {
           {!tuned.reachable && <p className="text-xs text-rose-300">Ese RTP no se alcanza con este bonus; se usó el más cercano.</p>}
         </div>
         {errors.length > 0 && <p className="w-full text-sm text-rose-300">{errors.join(' ')}</p>}
+        <button type="button" onClick={() => setShowSettings(false)} className="text-xs text-neutral-500 underline sm:hidden">
+          Ocultar ajustes
+        </button>
       </section>
 
       {/* All tabs stay mounted so the session, the log and a running round survive a tab switch. */}

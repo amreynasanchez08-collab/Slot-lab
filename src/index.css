@@ -9,3 +9,80 @@ body {
   margin: 0;
   background: #0a0a0a;
 }
+
+/* Winning cells bounce and glow three times once the reels stop. */
+@keyframes slot-win {
+  0%, 100% { transform: scale(1); filter: brightness(1); }
+  50% { transform: scale(1.07); filter: brightness(1.2) drop-shadow(0 0 8px rgba(255, 214, 80, 0.9)); }
+}
+.slot-win { animation: slot-win 0.8s ease-in-out 3; }
+
+/* Marquee bulbs: alternate bulbs light in turn. */
+@keyframes bulb-chase {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0.35; }
+}
+.bulb { animation: bulb-chase 1.2s steps(1) infinite; }
+.bulb:nth-child(even) { animation-delay: -0.6s; }
+
+/* Big win and free games banners pop in, hold, then fade. */
+@keyframes banner-pop {
+  0% { transform: scale(0.6); opacity: 0; }
+  12% { transform: scale(1.08); opacity: 1; }
+  20%, 85% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1); opacity: 0; }
+}
+.banner-pop { animation: banner-pop 2.2s ease-out forwards; }
+
+/* Fuego 27: flames flicker behind winning symbols. */
+@keyframes flame-flick {
+  from { transform: scaleY(0.86) scaleX(1.05); opacity: 0.8; }
+  to { transform: scaleY(1.08) scaleX(0.95); opacity: 1; }
+}
+.flame { transform-box: fill-box; transform-origin: 50% 100%; animation: flame-flick 0.9s ease-in-out infinite alternate; }
+.flame.d2 { animation-delay: -0.3s; }
+.flame.d3 { animation-delay: -0.6s; }
+
+/* Fuego 27: casino figures (condensed, heavy, tabular so counting numbers do not jump). */
+.casino-num {
+  font-family: 'Avenir Next Condensed', 'Roboto Condensed', sans-serif-condensed, Impact, 'Arial Narrow', sans-serif;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+.gold-text {
+  background: linear-gradient(180deg, #fff6c4 0%, #ffc433 50%, #d27a0c 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 2px 0 #4a0508) drop-shadow(0 0 1px #4a0508);
+}
+/* Embers rising from the bottom of the cabinet. */
+@keyframes ember-rise {
+  0% { transform: translateY(0) scale(1); opacity: 0; }
+  12% { opacity: 0.9; }
+  100% { transform: translateY(-520px) scale(0.4); opacity: 0; }
+}
+.ember { animation: ember-rise linear infinite; }
+/* The x2 button glows while the win can be gambled. */
+@keyframes x2-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 214, 80, 0); }
+  50% { box-shadow: 0 0 14px 4px rgba(255, 214, 80, 0.8); }
+}
+.x2-ready { animation: x2-glow 1.2s ease-in-out infinite; }
+/* The winning wheel sector blinks three times. */
+@keyframes sector-flash {
+  0%, 33%, 66%, 100% { opacity: 0; }
+  16%, 50%, 83% { opacity: 0.55; }
+}
+.sector-flash { animation: sector-flash 0.9s linear forwards; }
+/* Light rays turning behind a prize banner. */
+@keyframes rays-turn { to { transform: rotate(360deg); } }
+.rays { animation: rays-turn 20s linear infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .slot-win, .bulb, .flame, .ember, .x2-ready, .rays { animation: none; }
+  .ember { opacity: 0; }
+  .sector-flash { animation-duration: 0.01s; }
+  .banner-pop { animation-duration: 0.01s; animation-delay: 2s; }
+}

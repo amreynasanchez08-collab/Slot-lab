@@ -92,6 +92,9 @@ export function setBet(state: SessionState, bet: number): SessionState {
 
 /** Next level up (+1) or down (-1) from the current bet, clamped to the ladder. */
 export function stepBet(bet: number, direction: 1 | -1): number {
+  const top = BET_LEVELS[BET_LEVELS.length - 1];
+  // A bet typed in the settings can sit above the ladder: up keeps it, down returns to the top level.
+  if (bet > top) return direction === 1 ? bet : top;
   const i = BET_LEVELS.findIndex((level) => level >= bet);
   const at = i === -1 ? BET_LEVELS.length - 1 : BET_LEVELS[i] === bet ? i : direction === 1 ? i - 1 : i;
   return BET_LEVELS[Math.min(BET_LEVELS.length - 1, Math.max(0, at + direction))];

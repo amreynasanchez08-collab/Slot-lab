@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fuego 27 — propuestas</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #121013; color: #efe7dc; font: 15px/1.45 system-ui, "Segoe UI", sans-serif; }
+  header, section.dir { max-width: 1400px; margin: 0 auto; padding: 0 16px; }
+  header { padding-top: 26px; }
+  h1 { margin: 0 0 4px; font-size: 26px; }
+  header p { margin: 0; color: #b9ada0; max-width: 900px; }
+  section.dir { margin-top: 30px; }
+  .dir-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+  .dir-head h2 { margin: 0; font-size: 22px; }
+  .tag { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: #d9a441; border: 1px solid #d9a44166; border-radius: 999px; padding: 2px 10px; }
+  .dir-head p { margin: 0; color: #b9ada0; flex-basis: 100%; max-width: 900px; }
+  .swatches { display: flex; gap: 6px; }
+  .swatches i { width: 18px; height: 18px; border-radius: 4px; display: block; border: 1px solid #ffffff22; }
+  .screens { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; }
+  .screens figure { margin: 0; }
+  .screens figure:first-child { grid-row: span 2; }
+  .screens svg { width: 100%; height: auto; display: block; border-radius: 10px; box-shadow: 0 10px 30px #0009; }
+  figcaption { font-size: 13px; color: #b9ada0; margin-top: 6px; }
+  footer { max-width: 1400px; margin: 34px auto 40px; padding: 0 16px; color: #8d8277; font-size: 13px; }
+  @media (max-width: 900px) { .screens { grid-template-columns: 1fr; } .screens figure:first-child { grid-row: auto; } }
+  .flame { transform-box: fill-box; transform-origin: 50% 100%; animation: flick .9s ease-in-out infinite alternate; }
+  .flame.d2 { animation-delay: -.3s; }
+  .flame.d3 { animation-delay: -.6s; }
+  @keyframes flick { from { transform: scaleY(.86) scaleX(1.05); opacity: .8; } to { transform: scaleY(1.08) scaleX(.95); opacity: 1; } }
+  .pulse { animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .55; } }
+  @media (prefers-reduced-motion: reduce) { .flame, .pulse { animation: none; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Fuego 27 · tres direcciones visuales</h1>
+  <p>Las tres usan las mismas reglas y las mismas tres pantallas: juego base con un premio, rueda misteriosa y giros gratis.
+     Todo está dibujado por código; no usa arte, nombre ni marcas de Amusnet. "Fuego 27" es un nombre provisional.</p>
+</header>
+<main id="app"></main>
+<footer>Prototipo estático para escoger dirección. Las llamas se mueven; el resto es una imagen fija. La versión de celular se arma sobre la dirección elegida.</footer>
+<script>
+// ---------- palette and helpers ----------
+const C = {
+  red: '#e3222f', yellow: '#ffd43b', orange: '#ff8c1a', purple: '#8b2fd0', purpleDark: '#4b1477',
+  blue: '#4c55e6', green: '#86c93c', flesh: '#ff3d55', rind: '#2f9d3c', cream: '#f6f0d8',
+  stem: '#6e3c16', leaf: '#38a63c', gold: '#f2b72a', goldDark: '#b07a12', dark: '#2a120a',
+};
+function mix(hex, t) {
+  const n = parseInt(hex.slice(1), 16); const rgb = [n >> 16, (n >> 8) & 255, n & 255];
+  const f = (c) => (t > 0 ? Math.round(c + (255 - c) * t) : Math.round(c * (1 + t)));
+  return '#' + rgb.map((c) => f(c).toString(16).padStart(2, '0')).join('');
+}
+const at = (o) => Object.entries(o).map(([k, v]) => `${k}="${v}"`).join(' ');
+const pt = (cx, cy, r, deg) => [cx + r * Math.sin(deg * Math.PI / 180), cy - r * Math.cos(deg * Math.PI / 180)];
+function sector(cx, cy, r, a0, a1) {
+  const [x0, y0] = pt(cx, cy, r, a0); const [x1, y1] = pt(cx, cy, r, a1);
+  return `M${cx} ${cy} L${x0.toFixed(1)} ${y0.toFixed(1)} A${r} ${r} 0 0 1 ${x1.toFixed(1)} ${y1.toFixed(1)} Z`;
+}
+
+// ---------- symbols, drawn in a 100x100 box ----------
+const grapes = [[26, 32], [44, 32], [62, 32], [80, 32], [35, 48], [53, 48], [71, 48], [44, 64], [62, 64], [53, 80]];
+const SYM = {
+  cherry: [
+    { k: 'stroke', role: 'stem', el: 'path', a: { d: 'M36 60 C40 40 50 24 62 14' }, w: 4 },
+    { k: 'stroke', role: 'stem', el: 'path', a: { d: 'M68 64 C68 44 66 28 62 14' }, w: 4 },
+    { k: 'fill', role: 'leaf', el: 'path', a: { d: 'M62 15 C70 5 86 6 93 14 C84 22 70 23 62 15 Z' } },
+    { k: 'fill', role: 'red', el: 'circle', a: { cx: 34, cy: 68, r: 19 } },
+    { k: 'fill', role: 'red', el: 'circle', a: { cx: 68, cy: 72, r: 19 } },
+    { k: 'hl', el: 'ellipse', a: { cx: 27, cy: 60, rx: 6, ry: 4 } },
+    { k: 'hl', el: 'ellipse', a: { cx: 61, cy: 64, rx: 6, ry: 4 } },
+  ],
+  lemon: [
+    { k: 'fill', role: 'yellow', el: 'path', a: { d: 'M12 54 C14 34 32 22 52 22 C72 22 86 34 89 50 C93 52 93 57 89 58 C85 74 69 84 50 84 C31 84 15 74 11 58 C7 57 7 52 12 54 Z' } },
+    { k: 'fill', role: 'leaf', el: 'path', a: { d: 'M54 23 C58 12 70 8 78 12 C74 20 64 24 54 23 Z' } },
+    { k: 'hl', el: 'ellipse', a: { cx: 36, cy: 38, rx: 12, ry: 6 } },
+  ],
+  orange: [
+    { k: 'fill', role: 'orange', el: 'circle', a: { cx: 50, cy: 56, r: 33 } },
+    { k: 'stroke', role: 'stem', el: 'path', a: { d: 'M50 24 L52 16' }, w: 4 },
+    { k: 'fill', role: 'leaf', el: 'path', a: { d: 'M52 18 C60 6 76 6 84 12 C76 22 62 24 52 18 Z' } },
+    { k: 'hl', el: 'ellipse', a: { cx: 38, cy: 42, rx: 10, ry: 6 } },
+  ],
+  plum: [
+    { k: 'fill', role: 'purple', el: 'path', a: { d: 'M50 22 C74 22 86 42 84 60 C82 78 66 89 50 89 C32 89 16 77 16 58 C16 38 30 22 50 22 Z' } },
+    { k: 'stroke', role: 'purpleDark', el: 'path', a: { d: 'M50 26 C43 46 43 68 50 86' }, w: 2.5 },
+    { k: 'fill', role: 'leaf', el: 'path', a: { d: 'M50 23 C54 10 68 6 76 10 C70 19 60 23 50 23 Z' } },
+    { k: 'hl', el: 'ellipse', a: { cx: 34, cy: 42, rx: 8, ry: 12 } },
+  ],
+  melon: [
+    { k: 'fill', role: 'rind', el: 'path', a: { d: 'M8 38 A42 42 0 0 0 92 38 Z' } },
+    { k: 'fill', role: 'cream', el: 'path', a: { d: 'M13 38 A37 37 0 0 0 87 38 Z' } },
+    { k: 'fill', role: 'flesh', el: 'path', a: { d: 'M17 38 A33 33 0 0 0 83 38 Z' } },
+    ...[[34, 48], [50, 54], [66, 48], [42, 61], [58, 61]].map(([x, y]) => ({ k: 'fill', role: 'dark', el: 'ellipse', a: { cx: x, cy: y, rx: 2.4, ry: 4 } })),
+  ],
+  pear: [
+    { k: 'fill', role: 'green', el: 'path', a: { d: 'M50 16 C57 16 59 26 61 34 C64 46 82 52 82 70 C82 86 67 94 50 94 C33 94 18 86 18 70 C18 52 36 46 39 34 C41 26 43 16 50 16 Z' } },
+    { k: 'stroke', role: 'stem', el: 'path', a: { d: 'M50 18 L54 6' }, w: 4 },
+    { k: 'fill', role: 'leaf', el: 'path', a: { d: 'M53 12 C60 2 74 2 80 8 C72 16 61 16 53 12 Z' } },
+    { k: 'hl', el: 'ellipse', a: { cx: 34, cy: 66, rx: 7, ry: 12 } },
+  ],
+  grapes: [
+    { k: 'stroke', role: 'stem', el: 'path', a: { d: 'M53 22 L56 8' }, w: 4 },
+    { k: 'fill', role: 'leaf', el: 'path', a: { d: 'M56 12 C66 2 82 4 88 12 C78 18 66 18 56 12 Z' } },
+    ...grapes.map(([x, y]) => ({ k: 'fill', role: 'blue', el: 'circle', a: { cx: x, cy: y, r: 10 } })),
+    ...grapes.map(([x, y]) => ({ k: 'hl', el: 'ellipse', a: { cx: x - 3, cy: y - 3, rx: 3, ry: 2 } })),
+  ],
+  bell: [
+    { k: 'fill', role: 'gold', el: 'circle', a: { cx: 50, cy: 13, r: 5 } },
+    { k: 'fill', role: 'gold', el: 'path', a: { d: 'M50 16 C65 16 72 28 72 44 C72 58 76 66 86 74 L14 74 C24 66 28 58 28 44 C28 28 35 16 50 16 Z' } },
+    { k: 'fill', role: 'goldDark', el: 'rect', a: { x: 12, y: 72, width: 76, height: 9, rx: 4.5 } },
+    { k: 'fill', role: 'gold', el: 'circle', a: { cx: 50, cy: 87, r: 7 } },
+    { k: 'hl', el: 'ellipse', a: { cx: 40, cy: 38, rx: 6, ry: 13 } },
+  ],
+  seven: [
+    { k: 'text', role: 'red', el: 'text', a: { x: 52, y: 90, 'font-size': 100, 'text-anchor': 'middle', 'font-family': 'Arial Black, Impact, sans-serif', 'font-style': 'italic' }, text: '7' },
+  ],
+};
+
+function paint(s, style, p) {
+  const attrs = at(s.a);
+  const close = s.el === 'text' ? `>${s.text}</text>` : '/>';
+  if (s.k === 'hl') return style === 'gloss' ? `<${s.el} ${attrs} fill="#fff" opacity=".55"${close}` : '';
+  const col = C[s.role];
+  if (s.k === 'stroke') {
+    const c = style === 'neon' ? mix(col, .45) : col;
+    return `<${s.el} ${attrs} fill="none" stroke="${c}" stroke-width="${s.w}" stroke-linecap="round"${style === 'neon' ? ` filter="url(#${p}-glow)"` : ''}${close}`;
+  }
+  if (style === 'gloss') {
+    const fill = s.el === 'text' ? `url(#${p}-lin-${s.role})` : `url(#${p}-rad-${s.role})`;
+    const stroke = s.el === 'text'
+      ? ' stroke="#ffd56b" stroke-width="5" paint-order="stroke" stroke-linejoin="round"'
+      : ` stroke="${mix(col, -.55)}" stroke-width="1.2" stroke-opacity=".6"`;
+    return `<${s.el} ${attrs} fill="${fill}"${stroke}${close}`;
+  }
+  if (style === 'neon') {
+    return `<${s.el} ${attrs} fill="${mix(col, .2)}" fill-opacity=".3" stroke="${mix(col, .45)}" stroke-width="${s.el === 'text' ? 3 : 2.6}" stroke-linejoin="round" filter="url(#${p}-glow)"${close}`;
+  }
+  return `<${s.el} ${attrs} fill="${col}" stroke="#c9a14a" stroke-width="${s.el === 'text' ? 3 : 2}" paint-order="stroke" stroke-linejoin="round"${close}`;
+}
+function drawSym(name, style, p, x, y, s) {
+  const rot = name === 'melon' ? ' rotate(-14 50 50)' : '';
+  const body = SYM[name].map((sh) => paint(sh, style, p)).join('');
+  const shadow = style === 'gloss' ? ` filter="url(#${p}-drop)"` : '';
+  return `<g transform="translate(${(x - 50 * s).toFixed(1)} ${(y - 50 * s).toFixed(1)}) scale(${s.toFixed(3)})${rot}"${shadow}>${body}</g>`;
+}
+
+// ---------- themes ----------
+const THEMES = [
+  {
+    id: 'a', name: 'Brasa', tag: 'Más cerca del original', style: 'gloss',
+    concept: 'Fondo naranja encendido, rodillos color vino con marco dorado y frutas brillantes dobles. Los premios se prenden en llamas. Es la que más se parece a lo que juegas en el casino.',
+    swatches: ['#f59a24', '#6e1426', '#f5c542', '#e3222f', '#fff3d6'],
+    bg: (p) => `<radialGradient id="${p}-bg" cx=".5" cy=".42" r=".75"><stop offset="0" stop-color="#ffcf6a"/><stop offset=".35" stop-color="#f59a24"/><stop offset=".7" stop-color="#c9560c"/><stop offset="1" stop-color="#6e2205"/></radialGradient>
+      <rect width="960" height="540" fill="url(#${p}-bg)"/>
+      <path d="M-60 90 C120 40 170 300 30 600" stroke="#fff" stroke-opacity=".12" stroke-width="44" fill="none"/>
+      <path d="M1020 90 C840 40 790 300 930 600" stroke="#fff" stroke-opacity=".12" stroke-width="44" fill="none"/>`,
+    frame: (p) => `<linearGradient id="${p}-goldf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff2b0"/><stop offset=".35" stop-color="#e2a53a"/><stop offset=".7" stop-color="#8a5a12"/><stop offset="1" stop-color="#f6d47a"/></linearGradient>
+      <linearGradient id="${p}-win" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6e1426"/><stop offset="1" stop-color="#4a0817"/></linearGradient>
+      <rect x="164" y="56" width="632" height="404" rx="16" fill="url(#${p}-goldf)"/>
+      <rect x="176" y="68" width="608" height="380" rx="10" fill="url(#${p}-win)"/>
+      <rect x="176" y="68" width="608" height="380" rx="10" fill="none" stroke="#000" stroke-opacity=".35" stroke-width="6"/>
+      <path d="M380 74 V442 M580 74 V442" stroke="#f5c542" stroke-opacity=".45" stroke-width="2"/>`,
+    title: (p) => `<linearGradient id="${p}-tg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff6c4"/><stop offset=".5" stop-color="#ffc433"/><stop offset="1" stop-color="#d27a0c"/></linearGradient>
+      <text x="480" y="44" text-anchor="middle" font-family="Arial Black, Impact, sans-serif" font-size="34" font-style="italic">
+      <tspan fill="url(#${p}-tg)" stroke="#5a1406" stroke-width="5" paint-order="stroke">FUEGO</tspan><tspan dx="12" fill="url(#${p}-lin-red)" stroke="#ffd56b" stroke-width="5" paint-order="stroke">27</tspan></text>`,
+    flame: ['#fff1a8', '#ffb020', '#ff3d00'], flameGlow: false,
+    winBox: (x, y, w, h) => `<rect x="${x + 5}" y="${y + 5}" width="${w - 10}" height="${h - 10}" rx="10" fill="none" stroke="#ff8a00" stroke-opacity=".35" stroke-width="10"/><rect x="${x + 5}" y="${y + 5}" width="${w - 10}" height="${h - 10}" rx="10" fill="none" stroke="#ffe066" stroke-width="4"/>`,
+    tile: { wild: '#7a0d1c', scatter: '#3b0f5e', rim: '#f5c542', wildText: '#ffe27a', wildStroke: '#4a0508', mini: ['#c8121f', '#ffe2a0'], ribbon: '#ffcc3d', ribbonText: '#5a0a12' },
+    wheel: { m: ['#ff5560', '#8a0713'], f: ['#fff1c4', '#f6a62c'], div: '#ffd56b', textM: '#ffd56b', strokeM: '#4a0508', textF: '#b3121f', strokeF: '#fff3c8', rim: 'gold', gem: '#ff3b4e', hub: '#7a0d1c', hubText: '#ffd56b', pointer: '#ffd56b', font: 'Arial Black, Impact, sans-serif' },
+    btn: { fill: '#2a0d05', rim: '#f5c542', icon: '#ffe7a3', label: '#3a0a00', spinFill: '#1d0703', spinRim: '#f5c542', spinIcon: '#ffd56b', spinGlow: '#ff9a1a' },
+    bar: { fill: 'rgba(60,15,0,.75)', line: '#f5c542', label: '#ffd99a', value: '#fff3d6', chip: '#2a0d05', chipRim: '#a36a1a', chipText: '#ffe7a3', sel: '#f5c542', selText: '#3a0a00' },
+    msg: '#fff3d6', msgStroke: '#5a1406', badge: { fill: '#7a0d1c', rim: '#f5c542', text: '#ffe27a', font: 'Arial Black, Impact, sans-serif' },
+    banner: { fill: '#3a0a00', rim: '#f5c542', text: '#ffe7a3' }, freeGlow: '#ffcc33',
+  },
+  {
+    id: 'b', name: 'Neón', tag: 'Moderna', style: 'neon',
+    concept: 'Noche con letreros de neón magenta y cian. Las frutas se dibujan como tubos de luz y las llamas también son de neón. Se aleja del casino clásico y luce mejor en el celular con la pantalla oscura.',
+    swatches: ['#0a0618', '#ff2bd6', '#2de2ff', '#ff9a3d', '#ffffff'],
+    bg: (p) => `<linearGradient id="${p}-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#070414"/><stop offset="1" stop-color="#1b0a3c"/></linearGradient>
+      <radialGradient id="${p}-hz" cx=".5" cy="1" r=".6"><stop offset="0" stop-color="#ff2bd6" stop-opacity=".35"/><stop offset="1" stop-color="#ff2bd6" stop-opacity="0"/></radialGradient>
+      <rect width="960" height="540" fill="url(#${p}-bg)"/><rect width="960" height="540" fill="url(#${p}-hz)"/>
+      <g stroke="#ff2bd6" stroke-opacity=".14" stroke-width="1.5">${[-600, -360, -160, 0, 160, 360, 600].map((d) => `<path d="M480 330 L${480 + d * 1.8} 560"/>`).join('')}<path d="M0 470 H960 M0 505 H960"/></g>`,
+    frame: (p) => `<rect x="176" y="68" width="608" height="380" rx="12" fill="#0b0720"/>
+      <rect x="170" y="62" width="620" height="392" rx="16" fill="none" stroke="#ff2bd6" stroke-width="4" filter="url(#${p}-glow)"/>
+      <rect x="180" y="72" width="600" height="372" rx="9" fill="none" stroke="#2de2ff" stroke-opacity=".7" stroke-width="1.5"/>
+      <path d="M380 78 V438 M580 78 V438" stroke="#2de2ff" stroke-opacity=".3" stroke-width="1.5"/>`,
+    title: (p) => `<text x="480" y="44" text-anchor="middle" font-family="Arial Black, Impact, sans-serif" font-size="34" font-style="italic" fill="none" stroke-width="2.4" filter="url(#${p}-glow)">
+      <tspan stroke="#ff9a3d">FUEGO</tspan><tspan dx="12" stroke="#2de2ff">27</tspan></text>`,
+    flame: ['#ffd1f4', '#ff4fd8', '#ff7a1a'], flameGlow: true,
+    winBox: (x, y, w, h, p) => `<rect x="${x + 5}" y="${y + 5}" width="${w - 10}" height="${h - 10}" rx="10" fill="none" stroke="#2de2ff" stroke-width="3" filter="url(#${p}-glow)"/>`,
+    tile: { wild: '#120a2a', scatter: '#0a1a2c', rim: '#2de2ff', wildText: '#ffffff', wildStroke: '#ff2bd6', mini: ['#ff2bd6', '#2de2ff'], ribbon: '#2de2ff', ribbonText: '#08101c' },
+    wheel: { m: ['#24124a', '#140a2e'], f: ['#0f2c46', '#0a1a2c'], div: '#ff2bd6', textM: '#ffb35c', strokeM: 'none', textF: '#2de2ff', strokeF: 'none', rim: '#ff2bd6', gem: '#2de2ff', hub: '#0b0720', hubText: '#ffd1f4', pointer: '#2de2ff', font: 'Arial Black, Impact, sans-serif', glow: true },
+    btn: { fill: '#0b0720', rim: '#2de2ff', icon: '#bff6ff', label: '#9fdcff', spinFill: '#12082a', spinRim: '#ff2bd6', spinIcon: '#ffd1f4', spinGlow: '#ff2bd6' },
+    bar: { fill: 'rgba(5,3,15,.88)', line: '#ff2bd6', label: '#9fdcff', value: '#ffffff', chip: '#0b0720', chipRim: '#3b2a6a', chipText: '#cbb8ff', sel: '#ff2bd6', selText: '#0b0720' },
+    msg: '#2de2ff', msgStroke: 'none', badge: { fill: '#0b0720', rim: '#2de2ff', text: '#ffd1f4', font: 'Arial Black, Impact, sans-serif' },
+    banner: { fill: '#0b0720', rim: '#ff2bd6', text: '#2de2ff' }, freeGlow: '#2de2ff',
+  },
+  {
+    id: 'c', name: 'Salón dorado', tag: 'Elegante', style: 'deco',
+    concept: 'Verde esmeralda, negro y oro, con marcos art déco. Rodillos marfil y frutas planas con filo dorado. Es la más sobria: el fuego aparece solo cuando hay premio.',
+    swatches: ['#0b4a31', '#111111', '#c9a14a', '#f3ead6', '#e3222f'],
+    bg: (p) => `<radialGradient id="${p}-bg" cx=".5" cy=".45" r=".8"><stop offset="0" stop-color="#0f5a3c"/><stop offset="1" stop-color="#03231a"/></radialGradient>
+      <rect width="960" height="540" fill="url(#${p}-bg)"/>
+      <g fill="none" stroke="#c9a14a" stroke-opacity=".28" stroke-width="1.5">${[40, 70, 100, 130, 160].map((r) => `<path d="M0 ${r} A${r} ${r} 0 0 0 ${r} 0"/><path d="M960 ${r} A${r} ${r} 0 0 1 ${960 - r} 0"/><path d="M0 ${540 - r} A${r} ${r} 0 0 1 ${r} 540"/><path d="M960 ${540 - r} A${r} ${r} 0 0 0 ${960 - r} 540"/>`).join('')}</g>`,
+    frame: (p) => `<rect x="164" y="56" width="632" height="404" rx="4" fill="#0e0e0e"/>
+      <rect x="168" y="60" width="624" height="396" rx="3" fill="none" stroke="#c9a14a" stroke-width="2"/>
+      <rect x="176" y="68" width="608" height="380" rx="2" fill="#f3ead6"/>
+      <rect x="172" y="64" width="616" height="388" rx="2" fill="none" stroke="#c9a14a" stroke-width="1.2"/>
+      ${[[164, 56], [796, 56], [164, 460], [796, 460]].map(([x, y]) => `<rect x="${x - 9}" y="${y - 9}" width="18" height="18" fill="#c9a14a" transform="rotate(45 ${x} ${y})"/>`).join('')}
+      <path d="M380 76 V440 M580 76 V440" stroke="#c9a14a" stroke-opacity=".6" stroke-width="1.5"/>`,
+    title: (p) => `<linearGradient id="${p}-tg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6e2a6"/><stop offset="1" stop-color="#b58a32"/></linearGradient>
+      <path d="M300 34 H372 M588 34 H660" stroke="#c9a14a" stroke-width="1.5"/><rect x="292" y="30" width="8" height="8" fill="#c9a14a" transform="rotate(45 296 34)"/><rect x="660" y="30" width="8" height="8" fill="#c9a14a" transform="rotate(45 664 34)"/>
+      <text x="480" y="44" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="32" letter-spacing="8" fill="url(#${p}-tg)">FUEGO 27</text>`,
+    flame: ['#fff2c4', '#e7b54a', '#b5541b'], flameGlow: false,
+    winBox: (x, y, w, h) => `<rect x="${x + 5}" y="${y + 5}" width="${w - 10}" height="${h - 10}" fill="none" stroke="#b58a32" stroke-width="2.5"/><rect x="${x + 10}" y="${y + 10}" width="${w - 20}" height="${h - 20}" fill="none" stroke="#b58a32" stroke-width="1"/>`,
+    tile: { wild: '#0e0e0e', scatter: '#0b3d2a', rim: '#c9a14a', wildText: '#e9c46a', wildStroke: '#000', mini: ['#111', '#f3ead6'], ribbon: '#c9a14a', ribbonText: '#111' },
+    wheel: { m: ['#1d1d1d', '#0a0a0a'], f: ['#fbf5e8', '#e6dbc2'], div: '#c9a14a', textM: '#e9c46a', strokeM: 'none', textF: '#111', strokeF: 'none', rim: '#c9a14a', gem: '#c9a14a', hub: '#111', hubText: '#e9c46a', pointer: '#e9c46a', font: "Georgia, 'Times New Roman', serif" },
+    btn: { fill: '#111', rim: '#c9a14a', icon: '#e9c46a', label: '#e9d8a6', spinFill: '#c9a14a', spinRim: '#7a5a1a', spinIcon: '#111', spinGlow: '#e9c46a' },
+    bar: { fill: '#0b0b0b', line: '#c9a14a', label: '#c9a14a', value: '#f3ead6', chip: '#141414', chipRim: '#5a4a2a', chipText: '#e9c46a', sel: '#c9a14a', selText: '#111' },
+    msg: '#f3ead6', msgStroke: 'none', badge: { fill: '#111', rim: '#c9a14a', text: '#e9c46a', font: "Georgia, 'Times New Roman', serif" },
+    banner: { fill: '#111', rim: '#c9a14a', text: '#e9c46a' }, freeGlow: '#e9c46a',
+  },
+];
+
+// ---------- shared defs per screen ----------
+function defs(p, t) {
+  let d = `<filter id="${p}-glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="${p}-drop" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="2" dy="4" stdDeviation="3" flood-opacity=".45"/></filter>
+    <filter id="${p}-soft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="6"/></filter>
+    <linearGradient id="${p}-flame" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="${t.flame[0]}"/><stop offset=".5" stop-color="${t.flame[1]}"/><stop offset="1" stop-color="${t.flame[2]}"/></linearGradient>
+    <radialGradient id="${p}-sun" cx=".4" cy=".35" r=".7"><stop offset="0" stop-color="#fff6c8"/><stop offset=".5" stop-color="#ffc62e"/><stop offset="1" stop-color="#ff6a00"/></radialGradient>
+    <linearGradient id="${p}-gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff2b0"/><stop offset=".5" stop-color="#e2a53a"/><stop offset="1" stop-color="#8a5a12"/></linearGradient>
+    <radialGradient id="${p}-wm" cx=".5" cy=".5" r=".55"><stop offset="0" stop-color="${t.wheel.m[0]}"/><stop offset="1" stop-color="${t.wheel.m[1]}"/></radialGradient>
+    <radialGradient id="${p}-wf" cx=".5" cy=".5" r=".55"><stop offset="0" stop-color="${t.wheel.f[0]}"/><stop offset="1" stop-color="${t.wheel.f[1]}"/></radialGradient>`;
+  for (const [role, col] of Object.entries(C)) {
+    d += `<radialGradient id="${p}-rad-${role}" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="${mix(col, .55)}"/><stop offset=".5" stop-color="${col}"/><stop offset="1" stop-color="${mix(col, -.5)}"/></radialGradient>`;
+    d += `<linearGradient id="${p}-lin-${role}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${mix(col, .35)}"/><stop offset=".5" stop-color="${col}"/><stop offset="1" stop-color="${mix(col, -.45)}"/></linearGradient>`;
+  }
+  return `<defs>${d}</defs>`;
+}
+
+// ---------- pieces ----------
+const FLAME = 'M50 100 C22 92 16 64 32 42 C33 58 42 62 45 52 C42 36 50 20 60 6 C62 26 80 36 82 58 C84 80 72 95 50 100 Z';
+function flames(t, p, cx, cy, h) {
+  const base = cy + h / 2 - 4; const fh = h * .78;
+  return [[-58, .9, ''], [0, 1.05, ' d2'], [58, .9, ' d3']].map(([dx, k, cls]) => {
+    const sx = .62 * k; const sy = fh / 100 * k;
+    return `<g transform="translate(${cx + dx - 50 * sx} ${base - 100 * sy}) scale(${sx.toFixed(3)} ${sy.toFixed(3)})"><path class="flame${cls}" d="${FLAME}" fill="url(#${p}-flame)" opacity=".92"${t.flameGlow ? ` filter="url(#${p}-glow)"` : ''}/></g>`;
+  }).join('');
+}
+function wildTile(t, p, cx, cy, w, h) {
+  const x = cx - w / 2 + 7; const y = cy - h / 2 + 7; const W = w - 14; const H = h - 14; const R = H * .3;
+  let petals = '';
+  for (let i = 0; i < 10; i++) {
+    petals += `<path d="M0 ${-R * 1.6} C${R * .38} ${-R * 1.1} ${R * .45} ${-R * .7} 0 ${-R * .55} C${-R * .45} ${-R * .7} ${-R * .38} ${-R * 1.1} 0 ${-R * 1.6} Z" transform="rotate(${i * 36})" fill="url(#${p}-flame)"${t.style === 'neon' ? ` filter="url(#${p}-glow)"` : ''}/>`;
+  }
+  return `<rect x="${x}" y="${y}" width="${W}" height="${H}" rx="${t.style === 'deco' ? 3 : 12}" fill="${t.tile.wild}" stroke="${t.tile.rim}" stroke-width="3"/>
+    <g transform="translate(${cx} ${cy - 10})">${petals}<circle r="${R * .78}" fill="${t.style === 'neon' ? '#ffd1f4' : `url(#${p}-sun)`}" stroke="${t.tile.rim}" stroke-width="2"/></g>
+    <text x="${cx}" y="${y + H - 9}" text-anchor="middle" font-family="${t.badge.font}" font-weight="900" font-size="${(H * .25).toFixed(0)}" letter-spacing="2" fill="${t.tile.wildText}" stroke="${t.tile.wildStroke}" stroke-width="4" paint-order="stroke">WILD</text>`;
+}
+function scatterTile(t, p, cx, cy, w, h) {
+  const x = cx - w / 2 + 7; const y = cy - h / 2 + 7; const W = w - 14; const H = h - 14; const r = H * .36; const wy = cy - 12;
+  let s = '';
+  for (let i = 0; i < 8; i++) s += `<path d="${sector(cx, wy, r, i * 45 - 22.5, i * 45 + 22.5)}" fill="${t.tile.mini[i % 2]}"${t.style === 'neon' ? ' fill-opacity=".55"' : ''}/>`;
+  return `<rect x="${x}" y="${y}" width="${W}" height="${H}" rx="${t.style === 'deco' ? 3 : 12}" fill="${t.tile.scatter}" stroke="${t.tile.rim}" stroke-width="3"/>
+    ${s}<circle cx="${cx}" cy="${wy}" r="${r}" fill="none" stroke="${t.tile.rim}" stroke-width="4"${t.style === 'neon' ? ` filter="url(#${p}-glow)"` : ''}/><circle cx="${cx}" cy="${wy}" r="${r * .22}" fill="${t.tile.rim}"/>
+    <rect x="${cx - W * .36}" y="${y + H - 30}" width="${W * .72}" height="24" rx="6" fill="${t.tile.ribbon}"/>
+    <text x="${cx}" y="${y + H - 12}" text-anchor="middle" font-family="${t.badge.font}" font-weight="900" font-size="16" letter-spacing="3" fill="${t.tile.ribbonText}">RUEDA</text>`;
+}
+function cell(name, t, p, cx, cy, w, h) {
+  if (name === 'wild') return wildTile(t, p, cx, cy, w, h);
+  if (name === 'scatter') return scatterTile(t, p, cx, cy, w, h);
+  const s = h * .0078;
+  return drawSym(name, t.style, p, cx - 30, cy - 4, s * .92) + drawSym(name, t.style, p, cx + 26, cy + 6, s);
+}
+const WHEEL = [['x100', 'm'], ['10', 'f'], ['x50', 'm'], ['15', 'f'], ['x80', 'm'], ['10', 'f'], ['x30', 'm'], ['20', 'f']];
+function bigWheel(t, p, cx, cy, r) {
+  const w = t.wheel; const glow = w.glow ? ` filter="url(#${p}-glow)"` : '';
+  let out = '';
+  WHEEL.forEach(([, kind], i) => { out += `<path d="${sector(cx, cy, r, i * 45 - 22.5, i * 45 + 22.5)}" fill="url(#${p}-${kind === 'm' ? 'wm' : 'wf'})"/>`; });
+  WHEEL.forEach((_, i) => { const [x, y] = pt(cx, cy, r, i * 45 - 22.5); out += `<line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${w.div}" stroke-width="3"${glow}/>`; });
+  WHEEL.forEach(([label, kind], i) => {
+    const body = kind === 'm'
+      ? `<text x="${cx}" y="${cy - r * .6}" text-anchor="middle" font-family="${w.font}" font-weight="900" font-size="${r * .2}" fill="${w.textM}" stroke="${w.strokeM}" stroke-width="5" paint-order="stroke"${glow}>${label}</text>`
+      : `<text x="${cx}" y="${cy - r * .62}" text-anchor="middle" font-family="${w.font}" font-weight="900" font-size="${r * .24}" fill="${w.textF}" stroke="${w.strokeF}" stroke-width="5" paint-order="stroke"${glow}>${label}</text>
+         <text x="${cx}" y="${cy - r * .47}" text-anchor="middle" font-family="${w.font}" font-weight="700" font-size="${r * .075}" letter-spacing="2" fill="${w.textF}"${glow}>GIROS</text>`;
+    out += `<g transform="rotate(${i * 45} ${cx} ${cy})">${body}</g>`;
+  });
+  const rim = w.rim === 'gold' ? `url(#${p}-gold)` : w.rim;
+  out += `<circle cx="${cx}" cy="${cy}" r="${r + 7}" fill="none" stroke="${rim}" stroke-width="16"${glow}/>`;
+  out += `<circle cx="${cx}" cy="${cy}" r="${r - 2}" fill="none" stroke="#000" stroke-opacity=".3" stroke-width="3"/>`;
+  WHEEL.forEach((_, i) => {
+    const [x, y] = pt(cx, cy, r + 7, i * 45 - 22.5);
+    out += t.style === 'deco'
+      ? `<rect x="${(x - 6).toFixed(1)}" y="${(y - 6).toFixed(1)}" width="12" height="12" fill="${w.gem}" stroke="#111" stroke-width="1.5" transform="rotate(45 ${x.toFixed(1)} ${y.toFixed(1)})"/>`
+      : `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="7" fill="${w.gem}" stroke="#fff" stroke-opacity=".7" stroke-width="2"${glow}/>`;
+  });
+  out += `<circle cx="${cx}" cy="${cy}" r="${r * .2}" fill="${w.hub}" stroke="${rim}" stroke-width="5"${glow}/>
+    <text x="${cx}" y="${cy + 6}" text-anchor="middle" font-family="${w.font}" font-weight="900" font-size="17" fill="${w.hubText}">GIRAR</text>`;
+  const top = cy - r - 14;
+  out += t.style === 'deco'
+    ? `<path d="M${cx - 16} ${top - 14} H${cx + 16} L${cx} ${top + 26} Z" fill="${w.pointer}" stroke="#111" stroke-width="2"/>`
+    : `<path d="M${cx - 22} ${top - 12} Q${cx} ${top - 22} ${cx + 22} ${top - 12} L${cx} ${top + 28} Z" fill="${w.pointer}" stroke="${t.style === 'neon' ? 'none' : '#7a4a06'}" stroke-width="2"${glow}/>`;
+  return out;
+}
+function iconSpin(color) {
+  return `<g fill="none" stroke="${color}" stroke-width="7" stroke-linecap="round"><path d="M-24 4 A24 24 0 0 1 14 -19"/><path d="M24 -4 A24 24 0 0 1 -14 19"/></g>
+    <path d="M8 -30 L26 -18 L6 -10 Z M-8 30 L-26 18 L-6 10 Z" fill="${color}"/>`;
+}
+function rail(t, p, kind) {
+  const b = t.btn;
+  const small = (x, y, label, icon, on = true) => `<g opacity="${on ? 1 : .35}"><circle cx="${x}" cy="${y}" r="22" fill="${b.fill}" stroke="${b.rim}" stroke-width="3"/>${icon}
+    <text x="${x}" y="${y + 36}" text-anchor="middle" font-family="system-ui, sans-serif" font-weight="700" font-size="11" letter-spacing="1.5" fill="${t.style === 'gloss' ? '#3a0a00' : b.label}">${label}</text></g>`;
+  const x = 884;
+  return small(x, 120, 'DOBLE', `<text x="${x}" y="${126}" text-anchor="middle" font-family="Arial Black, sans-serif" font-size="17" fill="${b.icon}">x2</text>`, kind === 'base')
+    + `<g opacity="${kind === 'wheel' ? .35 : 1}"><circle cx="${x}" cy="262" r="64" fill="${b.spinGlow}" opacity=".35" filter="url(#${p}-soft)"/>
+       <circle cx="${x}" cy="262" r="54" fill="${b.spinFill}" stroke="${b.spinRim}" stroke-width="5"/><g transform="translate(${x} 262)">${iconSpin(b.spinIcon)}</g></g>`
+    + small(x, 352, 'TURBO', `<path transform="translate(${x} 352)" d="M4 -14 L-8 2 L0 2 L-4 14 L8 -2 L0 -2 Z" fill="${b.icon}"/>`, kind !== 'wheel')
+    + small(x, 424, 'AUTO', `<path transform="translate(${x} 424)" d="M-6 -9 L9 0 L-6 9 Z" fill="${b.icon}"/>`, kind !== 'wheel');
+}
+function bottomBar(t, kind) {
+  const b = t.bar;
+  const vals = { base: ['$491.30', 'GANANCIA', '$9.00'], wheel: ['$482.30', 'GANANCIA', '—'], free: ['$482.30', 'TOTAL RONDA', '$7.20'] }[kind];
+  const chips = ['$0.30', '$0.50', '$1.00', '$2.00', '$5.00'].map((v, i) => {
+    const x = 300 + i * 76; const sel = i === 0;
+    return `<rect x="${x}" y="491" width="66" height="40" rx="${t.style === 'deco' ? 2 : 8}" fill="${sel ? b.sel : b.chip}" stroke="${sel ? b.sel : b.chipRim}" stroke-width="1.5"/>
+      <text x="${x + 33}" y="517" text-anchor="middle" font-family="system-ui, sans-serif" font-weight="800" font-size="15" fill="${sel ? b.selText : b.chipText}">${v}</text>`;
+  }).join('');
+  return `<rect x="0" y="482" width="960" height="58" fill="${b.fill}"/><path d="M0 482.5 H960" stroke="${b.line}" stroke-opacity=".6"/>
+    <circle cx="34" cy="511" r="15" fill="none" stroke="${b.label}" stroke-width="2"/><text x="34" y="517" text-anchor="middle" font-family="Georgia, serif" font-weight="700" font-size="17" fill="${b.label}">i</text>
+    <text x="64" y="502" font-family="system-ui, sans-serif" font-weight="700" font-size="11" letter-spacing="1.5" fill="${b.label}">SALDO</text>
+    <text x="64" y="528" font-family="system-ui, sans-serif" font-weight="800" font-size="22" fill="${b.value}">${vals[0]}</text>
+    ${chips}
+    <text x="940" y="502" text-anchor="end" font-family="system-ui, sans-serif" font-weight="700" font-size="11" letter-spacing="1.5" fill="${b.label}">${vals[1]}</text>
+    <text x="940" y="528" text-anchor="end" font-family="system-ui, sans-serif" font-weight="800" font-size="22" fill="${b.value}">${vals[2]}</text>`;
+}
+function badge(t) {
+  const g = t.badge;
+  const shape = t.style === 'deco'
+    ? `<rect x="40" y="216" width="92" height="92" fill="${g.fill}" stroke="${g.rim}" stroke-width="3" transform="rotate(45 86 262)"/>`
+    : `<circle cx="86" cy="262" r="52" fill="${g.fill}" stroke="${g.rim}" stroke-width="4"${t.style === 'neon' ? ` filter="url(#${t.id}0-glow)"` : ''}/>`;
+  return `${shape}<text x="86" y="268" text-anchor="middle" font-family="${g.font}" font-weight="900" font-size="40" fill="${g.text}">27</text>
+    <text x="86" y="290" text-anchor="middle" font-family="system-ui, sans-serif" font-weight="800" font-size="11" letter-spacing="2" fill="${g.text}">FORMAS</text>`;
+}
+
+// ---------- screens ----------
+const GRIDS = {
+  base: [['cherry', 'seven', 'plum'], ['lemon', 'seven', 'bell'], ['seven', 'pear', 'orange']],
+  wheel: [['grapes', 'scatter', 'cherry'], ['scatter', 'bell', 'lemon'], ['plum', 'orange', 'scatter']],
+  free: [['wild', 'lemon', 'orange'], ['wild', 'orange', 'melon'], ['melon', 'cherry', 'grapes']],
+};
+const WINS = { base: [[0, 1], [1, 1], [2, 0]], wheel: [], free: [[0, 0], [1, 0], [2, 0], [2, 1], [2, 2]] };
+const MSG = { base: '3 × 77 EN 1 FORMA = $9.00', wheel: '', free: 'GIRO GRATIS 3 DE 10 · 3 FORMAS = $4.80' };
+const CAPTION = { base: 'Juego base con un premio: tres 7 en una forma', wheel: 'Rueda misteriosa: aparece encima de los rodillos', free: 'Giros gratis: más comodines y el contador de la ronda' };
+
+function screen(t, kind, idx) {
+  const p = t.id + idx;
+  const cw = 200; const ch = 124;
+  const isWin = (c, r) => WINS[kind].some(([wc, wr]) => wc === c && wr === r);
+  let cells = '';
+  GRIDS[kind].forEach((col, c) => col.forEach((name, r) => {
+    const cx = 180 + c * cw + cw / 2; const cy = 72 + r * ch + ch / 2;
+    if (isWin(c, r)) cells += flames(t, p, cx, cy, ch);
+    cells += cell(name, t, p, cx, cy, cw, ch);
+    if (isWin(c, r)) cells += t.winBox(180 + c * cw, 72 + r * ch, cw, ch, p);
+  }));
+  const freeGlow = kind === 'free' ? `<rect x="160" y="52" width="640" height="412" rx="18" fill="none" stroke="${t.freeGlow}" stroke-width="6" opacity=".85" filter="url(#${p}-glow)"/>` : '';
+  const msg = MSG[kind] ? `<text x="480" y="475" text-anchor="middle" font-family="system-ui, sans-serif" font-weight="800" font-size="15" letter-spacing="1.5" fill="${kind === 'free' ? t.freeGlow : t.msg}" stroke="${t.msgStroke}" stroke-width="4" paint-order="stroke">${MSG[kind]}</text>` : '';
+  const overlay = kind === 'wheel'
+    ? `<rect width="960" height="540" fill="#000" opacity=".58"/>${bigWheel(t, p, 480, 282, 198)}
+       <rect x="300" y="12" width="360" height="34" rx="17" fill="${t.banner.fill}" stroke="${t.banner.rim}" stroke-width="2"/>
+       <text class="pulse" x="480" y="35" text-anchor="middle" font-family="system-ui, sans-serif" font-weight="800" font-size="14" letter-spacing="1.5" fill="${t.banner.text}">LA RUEDA GIRA SOLA EN 12 s</text>`
+    : '';
+  return `<svg viewBox="0 0 960 540" role="img" aria-label="${t.name}: ${CAPTION[kind]}">${defs(p, t)}${t.bg(p)}${t.title(p)}${badge(t)}${freeGlow}${t.frame(p)}${cells}${msg}${rail(t, p, kind)}${bottomBar(t, kind)}${overlay}</svg>`;
+}
+
+document.getElementById('app').innerHTML = THEMES.map((t, n) => `
+  <section class="dir">
+    <div class="dir-head">
+      <h2>${n + 1}. ${t.name}</h2><span class="tag">${t.tag}</span>
+      <span class="swatches">${t.swatches.map((c) => `<i style="background:${c}"></i>`).join('')}</span>
+      <p>${t.concept}</p>
+    </div>
+    <div class="screens">
+      ${['base', 'wheel', 'free'].map((k, i) => `<figure>${screen(t, k, i)}<figcaption>${CAPTION[k]}</figcaption></figure>`).join('')}
+    </div>
+  </section>`).join('');
+</script>
+</body>
+</html>

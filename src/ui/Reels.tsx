@@ -18,18 +18,24 @@ interface ReelsProps {
   /** Row per reel for every payline of the game. */
   paylines: readonly (readonly number[])[];
   lineColors: readonly string[];
-  renderSymbol: (sym: number, cell: number) => ReactNode;
-  /** Cell size in px. */
+  /** index is the cell (reel * 3 + row) for the three symbols of the final window, undefined for filler. */
+  renderSymbol: (sym: number, cell: number, index?: number) => ReactNode;
+  /** Cell size in px (height, and width unless cellWidth is set). */
   cell?: number;
+  /** Cell width in px for wide cells (Fuego 27); defaults to cell. */
+  cellWidth?: number;
   /**
-   * classic: gold frame, white reels, symbols on a shared background (Big Show).
-   * tiles: no frame (the cabinet draws it), each symbol paints its own full tile (Plenty).
+   * drum: white reel drums shaded like cylinders, symbols on a shared background (Gran Show).
+   * tiles: each symbol paints its own full tile (Frutas 20 Hot).
+   * Neither draws a frame: the cabinet does.
    */
-  variant?: 'classic' | 'tiles';
+  variant?: 'drum' | 'tiles';
   /** Paylines to draw once the reels stop. */
   lines: number[];
   /** Cells to ring once the reels stop (anywhere wins, scatters). */
   cells: number[];
+  /** Cells that form a win; they pulse once the reels stop. */
+  pulse?: number[];
   instant: boolean;
   onStopped: () => void;
 }
@@ -38,12 +44,11 @@ function prefersReducedMotion(): boolean {
   return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-export function Reels({ grid, spin, paylines, lineColors, renderSymbol, cell = 96, variant = 'classic', lines, cells, instant, onStopped }: ReelsProps) {
+export function Reels({ grid, spin, paylines, lineColors, renderSymbol, cell = 96, cellWidth, variant = 'drum', lines, cells, pulse = [], instant, onStopped }: ReelsProps) {
   const reels = grid.length / ROWS;
-  const classic = variant === 'classic';
-  const colWidth = classic ? cell - 6 : cell;
-  const gap = classic ? 8 : 10;
-  const pad = classic ? 8 : 0;
+  const drum = variant === 'drum';
+  const colWidth = cellWidth ?? cell;
+  const gap = 10;
   const stride = colWidth + gap;
 
   const [settled, setSettled] = useState(true);
@@ -107,26 +112,29 @@ export function Reels({ grid, spin, paylines, lineColors, renderSymbol, cell = 9
 
   const width = reels * colWidth + (reels - 1) * gap;
   const height = ROWS * cell;
+  const pulseSet = new Set(pulse);
 
-  const reelWindow = (
-    <div className={`relative flex ${classic ? 'rounded-xl bg-neutral-950' : ''}`} style={{ gap, padding: pad }}>
+  return (
+    <div className="relative flex" style={{ gap }}>
       {columns.map((seq, r) => (
         <div
           key={r}
-          className={`relative overflow-hidden ${classic ? 'rounded-lg bg-gradient-to-b from-neutral-100 via-white to-neutral-200' : ''}`}
+          className={`relative overflow-hidden ${drum ? 'rounded-md bg-gradient-to-b from-[#d9d4cc] via-white to-[#d9d4cc]' : ''}`}
           style={{ width: colWidth, height }}
         >
           <div ref={(el) => { columnRefs.current[r] = el; }} className="will-change-transform">
             {seq.map((sym, i) => (
-              <div key={i} className="flex items-center justify-center" style={{ height: cell }}>
-                {renderSymbol(sym, cell)}
+              <div key={i} className={`flex items-center justify-center ${settled && i < ROWS && pulseSet.has(r * ROWS + i) ? 'slot-win' : ''}`} style={{ height: cell }}>
+                {renderSymbol(sym, cell, i < ROWS ? r * ROWS + i : undefined)}
               </div>
             ))}
           </div>
+          {/* Cylinder shading over the symbols: the drum curves away at the top and bottom. */}
+          {drum && <div className="pointer-events-none absolute inset-0 rounded-md bg-[linear-gradient(to_bottom,rgba(40,20,10,0.45),transparent_22%,transparent_78%,rgba(40,20,10,0.45))] shadow-[inset_0_0_6px_rgba(0,0,0,0.5)]" />}
         </div>
       ))}
       {settled && (lines.length > 0 || cells.length > 0) && (
-        <svg className="pointer-events-none absolute" style={{ left: pad, top: pad, width, height }} viewBox={`0 0 ${width} ${height}`}>
+        <svg className="pointer-events-none absolute" style={{ left: 0, top: 0, width, height }} viewBox={`0 0 ${width} ${height}`}>
           {lines.map((l) => {
             const pts = paylines[l].map((row, reel) => `${reel * stride + colWidth / 2},${row * cell + cell / 2}`).join(' ');
             return <polyline key={l} points={pts} fill="none" stroke={lineColors[l % lineColors.length]} strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" opacity={0.9} />;
@@ -141,10 +149,4 @@ export function Reels({ grid, spin, paylines, lineColors, renderSymbol, cell = 9
     </div>
   );
 
-  if (!classic) return reelWindow;
-  return (
-    <div className="relative mx-auto max-w-full overflow-x-auto rounded-2xl bg-gradient-to-b from-amber-400 to-amber-700 p-2 shadow-2xl" style={{ width: width + 2 * pad + 16 }}>
-      {reelWindow}
-    </div>
-  );
 }

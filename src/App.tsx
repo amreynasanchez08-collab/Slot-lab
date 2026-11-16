@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react';
 import { BigShowLab } from './ui/BigShowLab.tsx';
+import { FuegoLab } from './ui/fuego/FuegoLab.tsx';
+import { FuegoDefs } from './ui/fuego/FuegoSymbols.tsx';
 import { PlentyLab } from './ui/plenty/PlentyLab.tsx';
 import { loadJson, saveJson } from './ui/storage.ts';
 
-type Game = 'bigshow' | 'plenty';
+type Game = 'bigshow' | 'plenty' | 'fuego';
 
 const GAMES: { id: Game; label: string; detail: string }[] = [
   { id: 'bigshow', label: 'Gran Show', detail: '3x3 · 5 líneas · bailarinas' },
   { id: 'plenty', label: 'Frutas 20 Hot', detail: '5x3 · 20 líneas · estrellas' },
+  { id: 'fuego', label: 'Fuego 27', detail: '3x3 · 27 formas · rueda' },
 ];
 
 export default function App() {
@@ -17,6 +20,8 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100">
+      {/* Shared SVG gradients of Fuego 27, mounted outside the hidden tabs. */}
+      <FuegoDefs />
       <header className="border-b border-neutral-800 bg-neutral-950/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4">
           <div>
@@ -40,12 +45,15 @@ export default function App() {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-6">
-        {/* Both games stay mounted so switching keeps each session. */}
+        {/* Every game stays mounted so switching keeps each session. */}
         <div hidden={game !== 'bigshow'}>
           <BigShowLab active={game === 'bigshow'} />
         </div>
         <div hidden={game !== 'plenty'}>
           <PlentyLab active={game === 'plenty'} />
+        </div>
+        <div hidden={game !== 'fuego'}>
+          <FuegoLab active={game === 'fuego'} />
         </div>
       </main>
     </div>

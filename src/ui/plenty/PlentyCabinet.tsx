@@ -80,6 +80,8 @@ interface CabinetProps {
   spin: ReelSpin | null;
   winLines: number[];
   starCells: number[];
+  /** Cells that form each win; they pulse once the reels stop. */
+  pulse: number[];
   balance: number;
   bet: number;
   lastWin: number;
@@ -169,6 +171,7 @@ export function PlentyCabinet(p: CabinetProps) {
               variant="tiles"
               lines={p.winLines}
               cells={p.starCells}
+              pulse={p.pulse}
               instant={p.turbo}
               onStopped={p.onStopped}
             />

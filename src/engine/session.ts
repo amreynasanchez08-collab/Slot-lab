@@ -112,3 +112,22 @@ export function playSpin(machine: Machine, state: SessionState, rng: Rng): { sta
     },
   };
 }
+
+/** Bet ladder in cents; every level is a multiple of 5 cents (5 lines). */
+export const BET_LEVELS: readonly number[] = [5, 10, 15, 20, 25, 50, 75, 100, 150, 200, 250, 500, 1_000, 2_000];
+
+/** Changes the bet between spins. A running round keeps paying on the bet that triggered it. */
+export function setBet(state: SessionState, bet: number): SessionState {
+  assertBet(bet);
+  return { ...state, bet };
+}
+
+/** Next level up (+1) or down (-1) from the current bet, clamped to the ladder. */
+export function stepBet(bet: number, direction: 1 | -1): number {
+  const top = BET_LEVELS[BET_LEVELS.length - 1];
+  // A bet typed in the settings can sit above the ladder: up keeps it, down returns to the top level.
+  if (bet > top) return direction === 1 ? bet : top;
+  const i = BET_LEVELS.findIndex((level) => level >= bet);
+  const at = i === -1 ? BET_LEVELS.length - 1 : BET_LEVELS[i] === bet ? i : direction === 1 ? i - 1 : i;
+  return BET_LEVELS[Math.min(BET_LEVELS.length - 1, Math.max(0, at + direction))];
+}

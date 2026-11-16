@@ -1,18 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { PAYLINES, type NearMissKind, type Win } from '../engine/evaluate.ts';
+import type { NearMissKind, Win } from '../engine/evaluate.ts';
 import { fillGrid, type Machine } from '../engine/machine.ts';
 import { createRng, randomSeed } from '../engine/rng.ts';
-import { canSpin, newSession, playSpin, type SessionState, type SpinOutcome } from '../engine/session.ts';
-import { isDancer, PAYS, SYMBOL_NAMES } from '../engine/symbols.ts';
+import { BET_LEVELS, canSpin, newSession, playSpin, setBet, stepBet, type SessionState, type SpinOutcome } from '../engine/session.ts';
+import { PAYS, SYMBOL_NAMES } from '../engine/symbols.ts';
+import { GranShowCabinet, type Banner } from './bigshow/GranShowCabinet.tsx';
 import { MiniStat, Stat } from './Cards.tsx';
 import { useSpaceToSpin } from './useSpaceToSpin.ts';
 import { formatMoney, formatPct } from './format.ts';
-import { Reels, type ReelSpin } from './Reels.tsx';
-import { SymbolIcon } from './SymbolIcon.tsx';
+import type { ReelSpin } from './Reels.tsx';
 
 export const LINE_NAMES = ['Línea 1 (centro)', 'Línea 2 (arriba)', 'Línea 3 (abajo)', 'Línea 4 (diagonal ↘)', 'Línea 5 (diagonal ↗)'];
 
-type LogKind = 'win' | 'ldw' | 'mystery' | 'near' | 'bonus' | 'retrigger' | 'round' | 'loss' | 'info';
+type LogKind = 'win' | 'ldw' | 'mystery' | 'near' | 'bonus' | 'retrigger' | 'round' | 'bet' | 'loss' | 'info';
 
 interface LogEntry {
   id: number;
@@ -29,6 +29,7 @@ const LOG_STYLE: Record<LogKind, string> = {
   bonus: 'border-pink-400 text-pink-200',
   retrigger: 'border-fuchsia-500 text-fuchsia-200',
   round: 'border-amber-400 text-amber-100',
+  bet: 'border-cyan-400 text-cyan-100',
   loss: 'border-neutral-700 text-neutral-400',
   info: 'border-neutral-500 text-neutral-300',
 };
@@ -41,6 +42,7 @@ const LOG_LABEL: Record<LogKind, string> = {
   bonus: 'Juegos gratis',
   retrigger: 'Retrigger',
   round: 'Fin de ronda',
+  bet: 'Apuesta',
   loss: 'Sin premio',
   info: 'Aviso',
 };
@@ -53,9 +55,8 @@ const NEAR_MISS_TEXT: Record<NearMissKind, string> = {
 };
 
 const MAX_LOG = 250;
-const LINE_COLORS = ['#f43f5e', '#38bdf8', '#a3e635', '#f59e0b', '#c084fc'];
-// The dancer fills its cell edge to edge so a full stack reads as one figure.
-const renderSymbol = (sym: number, cell: number) => <SymbolIcon id={sym} size={isDancer(sym) ? cell - 6 : 72} />;
+/** A win this many times the bet gets the big-win banner. */
+const BIG_WIN = 10;
 /** Neutral starting stops on the base reels (no wins on screen). */
 const START_STOPS = [4, 4, 4];
 
@@ -100,6 +101,11 @@ export function Playground({ machine, startBalance, bet, active }: Props) {
   const [auto, setAuto] = useState(false);
   const [log, setLog] = useState<LogEntry[]>([]);
   const [totals, setTotals] = useState<Totals>(EMPTY_TOTALS);
+  const [roundPlayed, setRoundPlayed] = useState(0);
+  const [banner, setBanner] = useState<Banner | null>(null);
+  const bannerId = useRef(0);
+  const turboRef = useRef(turbo);
+  turboRef.current = turbo;
 
   const spinning = pending !== null;
 
@@ -176,6 +182,22 @@ export function Playground({ machine, startBalance, bet, active }: Props) {
     }
     push(entries);
 
+    if (outcome.isFreeGame) setRoundPlayed((n) => n + 1);
+    else if (outcome.awarded > 0) setRoundPlayed(0);
+    // Banners only at normal speed: in turbo they would flash by.
+    if (!turboRef.current) {
+      const stake = outcome.isFreeGame ? state.roundBet : outcome.charged;
+      const show: Omit<Banner, 'id'> | null =
+        outcome.awarded > 0
+          ? { title: outcome.retrigger ? `¡+${outcome.awarded} juegos gratis!` : `¡${outcome.awarded} juegos gratis!` }
+          : outcome.roundFinished
+            ? { title: 'Total de la ronda', amount: outcome.roundTotal }
+            : stake > 0 && outcome.win >= BIG_WIN * stake
+              ? { title: '¡Gran premio!', amount: outcome.win }
+              : null;
+      if (show) setBanner({ ...show, id: ++bannerId.current });
+    }
+
     const next: Totals = {
       spins: n,
       wagered: prev.wagered + outcome.charged,
@@ -205,6 +227,25 @@ export function Playground({ machine, startBalance, bet, active }: Props) {
     if (!active) setAuto(false);
   }, [active]);
 
+  const changeBet = useCallback(
+    (bet: number) => {
+      const current = sessionRef.current;
+      if (pendingRef.current || current.freeGamesLeft > 0 || bet === current.bet) return;
+      const next = setBet(current, bet);
+      sessionRef.current = next;
+      setSession(next);
+      push([{ spin: totalsRef.current.spins, kind: 'bet', text: `Apuesta de ${formatMoney(current.bet)} a ${formatMoney(bet)}.` }]);
+    },
+    [push],
+  );
+
+  // Banners are one-shot: clearing them stops a replay when this tab is shown again.
+  useEffect(() => {
+    if (!banner) return;
+    const timer = window.setTimeout(() => setBanner(null), 2300);
+    return () => window.clearTimeout(timer);
+  }, [banner]);
+
   useSpaceToSpin(active, doSpin);
 
   const inRound = session.freeGamesLeft > 0 || (pending?.outcome.isFreeGame ?? false);
@@ -213,61 +254,40 @@ export function Playground({ machine, startBalance, bet, active }: Props) {
   const winLines = shown && !shown.isFreeGame ? shown.evaluation.wins.map((w) => w.line ?? -1).filter((l) => l >= 0) : [];
   const winCells = shown && shown.isFreeGame ? [...new Set(shown.evaluation.wins.flatMap((w) => w.cells))] : [];
 
-  return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
-      <div className="space-y-5">
-        <div className={`rounded-2xl p-5 transition-colors ${inRound ? 'bg-fuchsia-950/60 ring-2 ring-pink-400/60' : 'bg-neutral-900'}`}>
-          {inRound && (
-            <p className="mb-3 text-center text-sm font-semibold uppercase tracking-widest text-pink-300">
-              Juegos gratis · paga cualquier trío en pantalla · bailarina x3 / x2 / x1
-            </p>
-          )}
-          <Reels
-            grid={grid}
-            spin={spin}
-            paylines={PAYLINES}
-            lineColors={LINE_COLORS}
-            renderSymbol={renderSymbol}
-            lines={winLines}
-            cells={winCells}
-            instant={turbo}
-            onStopped={onStopped}
-          />
-          {!inRound && (
-            <div className="mt-3 flex flex-wrap justify-center gap-3 text-xs text-neutral-400">
-              {LINE_NAMES.map((name, i) => (
-                <span key={name} className="flex items-center gap-1">
-                  <span className="inline-block h-1.5 w-4 rounded" style={{ background: LINE_COLORS[i] }} />
-                  {name}
-                </span>
-              ))}
-            </div>
-          )}
-          <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-            <button
-              type="button"
-              onClick={doSpin}
-              disabled={spinning || auto}
-              className="rounded-full bg-gradient-to-b from-rose-500 to-rose-700 px-10 py-3 text-lg font-bold text-white shadow-lg transition hover:brightness-110 disabled:opacity-40"
-            >
-              {session.freeGamesLeft > 0 ? `Juego gratis (${session.freeGamesLeft})` : 'Girar'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setAuto((a) => !a)}
-              disabled={!auto && !canSpin(session)}
-              className={`rounded-full px-5 py-3 text-sm font-semibold ${auto ? 'bg-amber-400 text-neutral-950' : 'bg-neutral-800 text-neutral-200 hover:bg-neutral-700'}`}
-            >
-              {auto ? 'Detener auto' : 'Auto'}
-            </button>
-            <label className="flex items-center gap-2 text-sm text-neutral-300">
-              <input type="checkbox" checked={turbo} onChange={(e) => setTurbo(e.target.checked)} className="h-4 w-4 accent-amber-400" />
-              Turbo (sin animación)
-            </label>
-          </div>
-          <p className="mt-2 text-center text-xs text-neutral-500">Barra espaciadora = girar</p>
-        </div>
+  const locked = spinning || auto || session.freeGamesLeft > 0;
+  const pulse = shown ? [...new Set(shown.evaluation.wins.flatMap((w) => w.cells))] : [];
 
+  return (
+    <div className="space-y-5">
+      <GranShowCabinet
+        grid={grid}
+        spin={spin}
+        winLines={winLines}
+        winCells={winCells}
+        pulse={pulse}
+        balance={displayBalance}
+        bet={session.bet}
+        lastWin={shown?.win ?? 0}
+        freeGamesLeft={session.freeGamesLeft}
+        freeGamesPlayed={roundPlayed}
+        inRound={inRound}
+        spinning={spinning}
+        auto={auto}
+        turbo={turbo}
+        canBetDown={!locked && session.bet > BET_LEVELS[0]}
+        canBetUp={!locked && session.bet < BET_LEVELS[BET_LEVELS.length - 1]}
+        onBet={(dir) => changeBet(stepBet(sessionRef.current.bet, dir))}
+        onMaxBet={() => changeBet(BET_LEVELS[BET_LEVELS.length - 1])}
+        onTurbo={() => setTurbo((t) => !t)}
+        onAuto={() => setAuto((a) => !a)}
+        onSpin={doSpin}
+        onStopped={onStopped}
+        banner={banner}
+      />
+      <p className="hidden text-center text-xs text-neutral-500 sm:block">Barra espaciadora = girar</p>
+
+    <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
+      <div className="min-w-0 space-y-5">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <Stat label="Saldo actual" value={formatMoney(displayBalance)} strong />
           <Stat label="Apuesta" value={`${formatMoney(session.bet)} · ${formatMoney(session.bet / 5)} por línea`} />
@@ -306,6 +326,7 @@ export function Playground({ machine, startBalance, bet, active }: Props) {
           ))}
         </ol>
       </aside>
+    </div>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import type { ReelSet, TuneResult } from '../engine/machine.ts';
 import { MYSTERY_MEAN_PAY, MYSTERY_SYMBOLS, PAYS, SYMBOL_NAMES } from '../engine/symbols.ts';
 import { formatInt, formatPct } from './format.ts';
-import { SymbolIcon } from './SymbolIcon.tsx';
+import { GranShowSymbol } from './bigshow/GranShowSymbols.tsx';
 
 export function MathPanel({ tuned }: { tuned: TuneResult }) {
   const { machine, analysis } = tuned;
@@ -66,7 +66,7 @@ export function MathPanel({ tuned }: { tuned: TuneResult }) {
               {[...MYSTERY_SYMBOLS].reverse().map((s) => (
                 <tr key={s} className="border-t border-neutral-800">
                   <td className="flex items-center gap-3 py-2 text-neutral-200">
-                    <SymbolIcon id={s} size={32} />
+                    <GranShowSymbol id={s} size={32} />
                     {SYMBOL_NAMES[s]}
                   </td>
                   <td className="font-mono text-neutral-100">{PAYS[s]}x</td>
@@ -99,7 +99,7 @@ function StripTable({ title, reels }: { title: string; reels: ReelSet }) {
               {strip.map((sym, i) => (
                 <li key={i} className="flex items-center gap-2 text-neutral-300">
                   <span className="w-5 text-right font-mono text-neutral-500">{i}</span>
-                  <SymbolIcon id={sym} size={16} />
+                  <GranShowSymbol id={sym} size={16} />
                   <span className="flex-1 truncate">{SYMBOL_NAMES[sym]}</span>
                   <span className="w-14 text-right font-mono text-neutral-500">{formatPct(reels.weights[r][i] / reels.totalWeight[r])}</span>
                 </li>

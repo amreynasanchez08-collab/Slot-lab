@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createRng, randomSeed } from '../../engine/rng.ts';
-import type { LineWin } from '../../plenty/evaluate.ts';
+import { PAYLINES, type LineWin } from '../../plenty/evaluate.ts';
 import { fillGrid, type Machine } from '../../plenty/machine.ts';
 import {
   BET_LEVELS,
@@ -310,7 +310,10 @@ export function PlentyPlayground({ machine, startBalance, bet, configVersion, ac
   const displayBalance = spinning && pendingRef.current ? session.balance - pendingRef.current.outcome.charged : session.balance;
   const winLines = shown ? shown.evaluation.wins.map((w) => w.line) : [];
   const starCells = shown && shown.evaluation.scatterMultiplier > 0 ? shown.evaluation.starCells : [];
-  const betIndex = BET_LEVELS.indexOf(session.bet);
+  // Only the matching symbols of each line pulse, counted from the left reel.
+  const pulse = shown
+    ? [...new Set([...shown.evaluation.wins.flatMap((w) => PAYLINES[w.line].slice(0, w.count).map((row, reel) => reel * 3 + row)), ...starCells])]
+    : [];
   const locked = spinning || auto;
 
   const gambleScreen = gambling && session.pendingWin > 0 && (
@@ -358,6 +361,7 @@ export function PlentyPlayground({ machine, startBalance, bet, configVersion, ac
         spin={spin}
         winLines={winLines}
         starCells={starCells}
+        pulse={pulse}
         balance={displayBalance}
         bet={session.bet}
         lastWin={totals.lastWin}
@@ -365,8 +369,8 @@ export function PlentyPlayground({ machine, startBalance, bet, configVersion, ac
         spinning={spinning}
         auto={auto}
         turbo={turbo}
-        canBetDown={!locked && betIndex !== 0}
-        canBetUp={!locked && betIndex !== BET_LEVELS.length - 1}
+        canBetDown={!locked && session.bet > BET_LEVELS[0]}
+        canBetUp={!locked && session.bet < BET_LEVELS[BET_LEVELS.length - 1]}
         onBet={(dir) => changeBet(stepBet(sessionRef.current.bet, dir))}
         onMaxBet={() => changeBet(BET_LEVELS[BET_LEVELS.length - 1])}
         onTurbo={() => setTurbo((t) => !t)}

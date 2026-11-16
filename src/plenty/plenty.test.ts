@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createRng } from '../engine/rng.ts';
 import { evaluate, evaluateLineSymbols, REELS, ROWS } from './evaluate.ts';
 import { analyze, buildMachine, fillGrid, tune } from './machine.ts';
-import { gamble, newSession, playSpin } from './session.ts';
+import { BET_LEVELS, gamble, newSession, playSpin, stepBet } from './session.ts';
 import { simulatePlenty } from './simulate.ts';
 import { BELL, CHERRY, LEMON, MELON, ORANGE, PLUM, SEVEN, STAR } from './symbols.ts';
 
@@ -125,5 +125,16 @@ describe('session and gamble', () => {
 
   it('rejects bets that are not a multiple of 20 cents', () => {
     expect(() => newSession(1_000, 50)).toThrow();
+  });
+});
+
+describe('bet ladder', () => {
+  it('steps along the ladder and handles a bet typed above it', () => {
+    const top = BET_LEVELS[BET_LEVELS.length - 1];
+    expect(stepBet(100, 1)).toBe(120);
+    expect(stepBet(20, -1)).toBe(20);
+    expect(stepBet(top, 1)).toBe(top);
+    expect(stepBet(top * 2, 1)).toBe(top * 2);
+    expect(stepBet(top * 2, -1)).toBe(top);
   });
 });

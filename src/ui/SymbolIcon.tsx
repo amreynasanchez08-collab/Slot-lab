@@ -1,10 +1,6 @@
 import {
   BELL,
-  BONUS,
   CHERRY,
-  DANCER_HEAD,
-  DANCER_LEGS,
-  DANCER_TORSO,
   LEMON,
   MELON,
   ORANGE,
@@ -84,53 +80,6 @@ function renderSymbol(id: number) {
           </text>
         </g>
       );
-    case BONUS:
-      return (
-        <g>
-          <path d="M50 6 L62 36 L94 38 L69 58 L78 90 L50 72 L22 90 L31 58 L6 38 L38 36Z" fill="#ffd54f" stroke="#ff8f00" strokeWidth="3" strokeLinejoin="round" />
-          <text x="50" y="64" textAnchor="middle" fontSize="34" fontWeight="900" fontFamily="system-ui, sans-serif" fill="#7a3e00">
-            ?
-          </text>
-        </g>
-      );
-    // The dancer spans three cells; each part is drawn edge to edge so a full stack reads as one figure.
-    case DANCER_HEAD:
-      return (
-        <g>
-          <rect x="0" y="0" width="100" height="100" fill="#4a0d3a" />
-          <path d="M30 40 C26 14 74 14 70 40 C74 52 64 60 50 60 C36 60 26 52 30 40Z" fill="#3b1d12" />
-          <ellipse cx="50" cy="44" rx="15" ry="18" fill="#f2c19c" />
-          <path d="M34 30 C40 18 60 18 66 30 C58 26 42 26 34 30Z" fill="#3b1d12" />
-          <path d="M36 10 L44 24 L50 6 L56 24 L64 10 L62 28 L38 28Z" fill="#ffd54f" stroke="#ff8f00" strokeWidth="1.5" />
-          <rect x="45" y="60" width="10" height="12" fill="#f2c19c" />
-          <path d="M20 100 C22 80 36 72 50 72 C64 72 78 80 80 100Z" fill="#f2c19c" />
-          <MultiplierBadge value={3} />
-        </g>
-      );
-    case DANCER_TORSO:
-      return (
-        <g>
-          <rect x="0" y="0" width="100" height="100" fill="#4a0d3a" />
-          <path d="M20 0 C14 30 10 50 6 64" stroke="#f2c19c" strokeWidth="8" strokeLinecap="round" fill="none" />
-          <path d="M80 0 C86 30 90 50 94 64" stroke="#f2c19c" strokeWidth="8" strokeLinecap="round" fill="none" />
-          <path d="M26 0 L74 0 C72 30 66 56 62 70 L38 70 C34 56 28 30 26 0Z" fill="#e91e63" />
-          <path d="M30 6 C40 14 60 14 70 6" stroke="#ffd54f" strokeWidth="4" fill="none" />
-          <path d="M14 70 C30 62 70 62 86 70 C96 82 86 100 50 100 C14 100 4 82 14 70Z" fill="#f48fb1" stroke="#e91e63" strokeWidth="2" />
-          <MultiplierBadge value={2} />
-        </g>
-      );
-    case DANCER_LEGS:
-      return (
-        <g>
-          <rect x="0" y="0" width="100" height="100" fill="#4a0d3a" />
-          <path d="M10 0 C20 14 80 14 90 0Z" fill="#f48fb1" />
-          <path d="M42 8 L38 84" stroke="#f2c19c" strokeWidth="9" strokeLinecap="round" />
-          <path d="M58 8 L64 84" stroke="#f2c19c" strokeWidth="9" strokeLinecap="round" />
-          <path d="M30 84 L42 84 L40 94 L26 94Z" fill="#e91e63" />
-          <path d="M60 84 L72 84 L76 94 L62 94Z" fill="#e91e63" />
-          <MultiplierBadge value={1} />
-        </g>
-      );
     default:
       return null;
   }
@@ -145,16 +94,5 @@ export function StarIcon({ size = 64 }: { size?: number }) {
       <circle cx="58" cy="46" r="4" fill="#5d3200" />
       <path d="M40 58 C46 64 54 64 60 58" stroke="#5d3200" strokeWidth="3.5" fill="none" strokeLinecap="round" />
     </svg>
-  );
-}
-
-function MultiplierBadge({ value }: { value: number }) {
-  return (
-    <g>
-      <rect x="66" y="66" width="30" height="24" rx="6" fill="#ffd54f" stroke="#ff8f00" strokeWidth="2" />
-      <text x="81" y="84" textAnchor="middle" fontSize="16" fontWeight="900" fontFamily="system-ui, sans-serif" fill="#7a3e00">
-        x{value}
-      </text>
-    </g>
   );
 }
